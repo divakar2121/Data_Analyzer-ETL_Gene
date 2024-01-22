@@ -1,0 +1,237 @@
+import tkinter as tk
+from tkinter import filedialog
+from tkinter import messagebox
+import pandas as pd
+import numpy as np
+import os
+import matplotlib.pyplot as plt
+
+
+output_path = os.path.abspath("excel_data_from_tkinter")
+
+class DataAnalyzerApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Data Analyzer App")
+
+        self.dataframe = None
+        self.column_labels = []
+
+        # Create a button to upload an Excel file
+        upload_button = tk.Button(root, text="Upload Excel File", command=self.upload_file)
+        upload_button.pack()
+
+        # Create a label and dropdown for column selection
+        self.column_label = tk.Label(root, text="Select a Column:")
+        self.column_label.pack()
+        self.column_selection = tk.StringVar()
+        self.column_dropdown = tk.OptionMenu(root, self.column_selection, "No Columns")
+        self.column_dropdown.pack()
+
+       
+        analyze_button = tk.Button(root, text="Analyze", command=self.analyze_data)
+        analyze_button.pack()
+
+     
+        self.unique_label = tk.Label(root, text="Unique Values:")
+        self.unique_label.pack()
+
+        
+        self.unique_values_listbox = tk.Listbox(root, selectmode=tk.MULTIPLE)
+        self.unique_values_listbox.pack()
+
+       
+        popup_button = tk.Button(root, text="Create Popups", command=self.create_popups)
+        popup_button.pack()
+
+        
+        self.selected_unique_values = []
+
+       
+        self.unique_dataframes = {}
+
+    def upload_file(self):
+        file_path = filedialog.askopenfilename(filetypes=[("Excel Files", "*.xlsx"), ("All Files", "*.*")])
+        if file_path:
+            try:
+                self.dataframe = pd.read_excel(file_path)
+                self.column_labels = self.dataframe.columns.tolist()
+                self.update_column_dropdown()
+                self.dataframe = self.dataframe.fillna(0)  # Replace NaN with 0
+                messagebox.showinfo("Info", "File uploaded successfully!")
+            except Exception as e:
+                messagebox.showerror("Error", f"Error reading the file: {str(e)}")
+
+    def update_column_dropdown(self):
+        for column in self.column_labels:
+            self.column_dropdown['menu'].add_command(label=column, command=lambda col=column: self.column_selection.set(col))
+        self.column_selection.set("No Columns")
+
+    def analyze_data(self):
+        if self.dataframe is not None:
+            selected_column = self.column_selection.get()
+            if selected_column != "No Columns":
+                unique_values = self.dataframe[selected_column].unique()
+                unique_values = [value for value in unique_values if not pd.isna(value)]
+                print(f"Unique values for '{selected_column}':")
+                for value in unique_values:
+                    print(value)
+                self.update_unique_listbox(unique_values)
+            else:
+                messagebox.showerror("Error", "Please select a valid column for analysis.")
+        else:
+            messagebox.showerror("Error", "No data available for analysis. Please upload an Excel file first.")
+
+    def update_unique_listbox(self, values):
+        self.unique_values_listbox.delete(0, tk.END)
+        for value in values:
+            self.unique_values_listbox.insert(tk.END, value)
+
+    def create_popups(self):
+        selected_indices = self.unique_values_listbox.curselection()
+        if selected_indices:
+            selected_column = self.column_selection.get()
+            if selected_column != "No Columns":
+                self.selected_unique_values = [self.unique_values_listbox.get(i) for i in selected_indices]
+                for value in self.selected_unique_values:
+                    self.create_popup(value, selected_column)
+            else:
+                messagebox.showerror("Error", "Please select a valid column for analysis.")
+        else:
+            messagebox.showerror("Error", "Please select one or more unique values to create popups.")
+
+    def create_popup(self, unique_value, selected_column):
+        stripped_cell_line_name = self.dataframe['stripped_cell_line_name'][
+            self.dataframe[selected_column] == unique_value]
+        popup = tk.Toplevel(self.root)
+        popup.title(f"Select X, Y, and Z Columns for {unique_value}")
+
+        lis = self.column_labels
+
+        x_column_selection = tk.StringVar()
+        y_column_selection = tk.StringVar()
+        z_column_selection = tk.StringVar()
+        z_checkbox_var = tk.BooleanVar()
+        z_checkbox_var.set(False)
+
+        # Create an additional label, dropdown, and checkbox
+        label_additional = tk.Label(popup, text="Additional Column:")
+        label_additional.pack()
+        additional_column_selection = tk.StringVar()
+        additional_column_dropdown = tk.OptionMenu(popup, additional_column_selection, *lis)
+        additional_column_dropdown.pack()
+        additional_checkbox_var = tk.BooleanVar()
+        additional_checkbox_var.set(False)  # Uncheck by default
+
+        label_x = tk.Label(popup, text="X Column:")
+        label_x.pack()
+        x_column_dropdown = tk.OptionMenu(popup, x_column_selection, *lis)
+        x_column_dropdown.pack()
+
+        label_y = tk.Label(popup, text="Y Column:")
+        label_y.pack()
+        y_column_dropdown = tk.OptionMenu(popup, y_column_selection, *lis)
+        y_column_dropdown.pack()
+
+        label_z = tk.Label(popup, text="Z Column:")
+        label_z.pack()
+        z_column_dropdown = tk.OptionMenu(popup, z_column_selection, *lis)
+        z_column_dropdown.pack()
+
+        z_checkbox = tk.Checkbutton(popup, text="Add Z Axis", variable=z_checkbox_var, onvalue=True, offvalue=False)
+        z_checkbox.pack()
+
+        # Create a "Label All Datasets" checkbox
+        label_all_datasets_var = tk.BooleanVar()
+        label_all_datasets_var.set(False)  # Uncheck by default
+        label_all_datasets_checkbox = tk.Checkbutton(popup, text="Label All Datasets", variable=label_all_datasets_var,
+                                                     onvalue=True, offvalue=False)
+        label_all_datasets_checkbox.pack()
+
+        # Create dropdowns for dashed line values
+        x_dash_label = tk.Label(popup, text="Dashed Lines for X Axis:")
+        x_dash_label.pack()
+        x_dash_var = tk.StringVar()
+        x_dash_dropdown = tk.OptionMenu(popup, x_dash_var, *[-3, -2.5, -2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2, 2.5, 3])
+        x_dash_dropdown.pack()
+
+        y_dash_label = tk.Label(popup, text="Dashed Lines for Y Axis:")
+        y_dash_label.pack()
+        y_dash_var = tk.StringVar()
+        y_dash_dropdown = tk.OptionMenu(popup, y_dash_var, *[-3, -2.5, -2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2, 2.5, 3])
+        y_dash_dropdown.pack()
+
+        # Create a "Plot" button in the popup
+        plot_button = tk.Button(popup, text="Plot",
+                                command=lambda: self.plot_scatter(x_column_selection.get(), y_column_selection.get(),
+                                                                  z_column_selection.get() if z_checkbox_var.get() else None,
+                                                                  unique_value, selected_column,
+                                                                  additional_column_selection.get(),
+                                                                  label_all_datasets_var.get(),
+                                                                  x_dash_var.get(), y_dash_var.get()))
+        plot_button.pack()
+
+    def plot_scatter(self, x_column, y_column, z_column, unique_value, selected_column, additional_column,
+                     label_all_datasets, x_dash_value, y_dash_value):
+        x_values = self.dataframe[x_column][self.dataframe[selected_column] == unique_value].to_numpy()
+        y_values = self.dataframe[y_column][self.dataframe[selected_column] == unique_value].to_numpy()
+        z_values = self.dataframe[z_column][
+            self.dataframe[selected_column] == unique_value].to_numpy() if z_column else None
+        additional_values = self.dataframe[additional_column][
+            self.dataframe[selected_column] == unique_value].to_numpy()
+
+        # Define a small shift value for labeling
+        label_shift = 0.01  # Adjust this value as needed
+        label_fontsize = 8  # Set the font size for the labels
+
+        def adjust_label_positions(x, y, labels):
+            label_positions = [(x[i], y[i]) for i in range(len(labels))]
+            adjusted_labels = []
+
+            for i, (label, (x, y)) in enumerate(zip(labels, label_positions)):
+                should_label = label_all_datasets  # Label if "Label All Datasets" is checked
+
+                if not label_all_datasets:
+                    for j in range(i):
+                        # Calculate the Euclidean distance between labels
+                        distance = ((x - label_positions[j][0]) ** 2 + (y - label_positions[j][1]) ** 2) ** 0.5
+                        if distance < label_shift:
+                            # Labels are too close, avoid labeling
+                            should_label = False
+                            break
+
+                if should_label:
+                    adjusted_labels.append((label, (x, y)))
+
+            return adjusted_labels
+
+        # Adjust label positions to avoid labeling clustered data points
+        adjusted_labels = adjust_label_positions(x_values, y_values, additional_values)
+
+        plt.figure(figsize=(10, 6))
+        scatter = plt.scatter(x_values, y_values, c=z_values, cmap='viridis', s=50)
+
+        for label, (x, y) in adjusted_labels:
+            plt.annotate(label, (x, y), fontsize=label_fontsize)
+
+        # Plot dashed lines for x and y axes
+        if x_dash_value and x_dash_value != "0" and x_dash_value != "0.0":
+            plt.axvline(x=float(x_dash_value), linestyle='--', color='red', label=f'X Dash = {x_dash_value}')
+        if y_dash_value and y_dash_value != "0" and y_dash_value != "0.0":
+            plt.axhline(y=float(y_dash_value), linestyle='--', color='blue', label=f'Y Dash = {y_dash_value}')
+
+        # Additional plot configuration here
+
+        plt.xlabel(x_column)
+        plt.ylabel(y_column)
+        plt.title(f"Scatter Plot for {unique_value}")
+        if z_column:
+            plt.colorbar(label=z_column)
+        plt.legend()
+        plt.show()
+
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = DataAnalyzerApp(root)
+    root.mainloop()
